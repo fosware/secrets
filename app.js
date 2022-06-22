@@ -1,4 +1,3 @@
-  //jshint esversion:6
 require("dotenv").config();
 const express = require("express");
 const bodyParser = require("body-parser");
@@ -30,12 +29,13 @@ app.use(passport.session());
 
 
 
-mongoose.connect("mongodb://localhost:27017/userBD");
+mongoose.connect("mongodb://127.0.0.1:27017/userBD");
 
 const userSchema = new mongoose.Schema({
   username: String,
   password: String,
-  googleId: String
+  googleId: String,
+  secret:   String
 });
 
 // const userSchema = new mongoose.Schema({});
@@ -60,7 +60,7 @@ passport.deserializeUser(function(id, done){
 passport.use(new GoogleStrategy({
     clientID: process.env.CLIENT_ID,
     clientSecret: process.env.CLIENT_SECRET,
-    callbackURL: "http://localhost:3000/auth/google/secrets",
+    callbackURL: "http://127.0.0.1:3000/auth/google/secrets",
     userProfileURL: "https://www.googleapis.com/oauth2/v3/userinfo"
   },
   function(accessToken, refreshToken, profile, cb) {
@@ -95,13 +95,42 @@ app.get("/register", function(req, res) {
   res.render("register");
 });
 
+
 app.get("/secrets", function(req, res){
-  console.log(req.isAuthenticated());
-  if(req.isAuthenticated())  {
-    res.render("secrets");
-  } else {
-    res.redirect("/login");
+  User.find({"secret": {$ne: null}}, function(err, foundUsers){
+    if(err){
+      console.log(err);
+    } else {
+      if (foundUsers) {
+        res.render("secrets", {userWithSecret: foundUsers});
+      }
+    }
+  });
+});
+
+app.get("/submit", function(req, res){
+  if (req.isAuthenticated()){
+    res.render("submit");
+  } else{
+    res.redirect("login");
   }
+});
+
+app.post("/submit", function(req, res){
+  const submitSecret = req.body.secret;
+  User.findById(req.user.id, function(err, foundUser){
+    if (err){
+      console.log(err);
+    } else {
+      if(foundUser) {
+        foundUser.secret = submitSecret;
+        foundUser.save(function(){
+          res.redirect("/secrets");
+
+        });
+      }
+    }
+  });
 });
 
 app.get("/logout", function(req, res){
